@@ -70,6 +70,46 @@ int select_nonbasic(simplex_t *s) {
   return -1;
 }
 
+void pivot(simplex_t *s, int row, int col) {
+  double **a = s->a;
+  double *b = s->b;
+  double *c = s->c;
+  int m = s->m;
+  int n = s->n;
+  int i, j, t;
+  t = s->var[col];
+  s->var[col] = s->var[n+row];
+  s->var[n+row] = t;
+  s->y = s->y + c[col] * b[row] / a[row][col];
+
+  for (i = 0; i < n; i++) {
+    if (i != col) {
+      c[i] = c[i] - c[col] * a[row][i] / a[row][col];
+    }
+  }
+  c[col] = -c[col] / a[row][col];
+  for (i = 0; i < m; i++) {
+    if (i != row) {
+      for (j = 0; j < n; j++) {
+        if (j != col) {
+          a[i][j] = a[i][j] - a[i][col] * a[row][j] / a[row][col];
+        }
+      }
+    }
+  }
+  for (i = 0; i < m; i++) {
+    if (i != row) {
+      a[i][col] = -a[i][col] / a[row][col];
+    }
+  }
+  for (i = 0; i < n; i++) {
+    if (i != col) {
+      a[row][i] = a[row][i] / a[row][col];
+    }
+  }
+  b[row] = b[row] / a[row][col];
+  a[row][col] = 1 / a[row][col];
+}
 
 double** make_matrix(int m, int n) {
   double** a;
