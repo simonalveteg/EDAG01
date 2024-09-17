@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+const double epsilon = 1e-6;
+
 void* xmalloc(size_t size) {
   void* ptr = malloc(size);
 
@@ -57,6 +59,17 @@ int initial(simplex_t *s, int m, int n, double** a, double* b, double* c, double
     return 1; // feasible
   }
 }
+
+int select_nonbasic(simplex_t *s) {
+  int i;
+  for (i=0; i < s->n; i++) {
+    if (s->c[i] > epsilon) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 
 double** make_matrix(int m, int n) {
   double** a;
