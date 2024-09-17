@@ -161,6 +161,10 @@ double xsimplex(int m, int n, double** a, double* b, double* c, double* x, doubl
   return s.y;
 }
 
+double simplex(int m, int n, double** a, double* b, double* c, double* x, double y, int* var, int h) {
+  return xsimplex(m, n, a, b, c, x, y, NULL, 0);
+}
+
 double** make_matrix(int m, int n) {
   double** a;
   int i;
