@@ -43,7 +43,7 @@ int init(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x
       s->var[i] = i;
     }
   }
-  for (k = 0; i = 1; i++) {
+  for (k = 0, i = 1; i < m; i++) {
     if (b[i] < b[k]) {
       k = i;
     }
@@ -83,31 +83,30 @@ void pivot(simplex_t *s, int row, int col) {
   s->var[n+row] = t;
   s->y = s->y + c[col] * b[row] / a[row][col];
 
-  for (i = 0; i < n; i++) {
-    if (i != col) {
+  for (i = 0; i < n; i++) 
+    if (i != col) 
       c[i] = c[i] - c[col] * a[row][i] / a[row][col];
-    }
-  }
+
   c[col] = -c[col] / a[row][col];
-  for (i = 0; i < m; i++) {
-    if (i != row) {
-      for (j = 0; j < n; j++) {
-        if (j != col) {
+
+  for (i = 0; i < m; i++) 
+    if (i != row) 
+      b[i] = b[i] - a[i][col] * b[row] / a[row][col];
+
+  for (i = 0; i < m; i++) 
+    if (i != row) 
+      for (j = 0; j < n; j++) 
+        if (j != col) 
           a[i][j] = a[i][j] - a[i][col] * a[row][j] / a[row][col];
-        }
-      }
-    }
-  }
-  for (i = 0; i < m; i++) {
-    if (i != row) {
+  
+  for (i = 0; i < m; i++) 
+    if (i != row) 
       a[i][col] = -a[i][col] / a[row][col];
-    }
-  }
-  for (i = 0; i < n; i++) {
-    if (i != col) {
+  
+  for (i = 0; i < n; i++) 
+    if (i != col) 
       a[row][i] = a[row][i] / a[row][col];
-    }
-  }
+  
   b[row] = b[row] / a[row][col];
   a[row][col] = 1 / a[row][col];
 }
@@ -122,8 +121,8 @@ double xsimplex(int m, int n, double** a, double* b, double* c, double* x, doubl
     return NAN;
   }
   
-  while ((col<-select_nonbasic(&s))>=0) {
-    row <- -1;
+  while ((col=select_nonbasic(&s))>=0) {
+    row = -1;
     for (i = 0; i < m; i++) {
       if (a[i][col] > epsilon && (row < 0 || b[i]/a[i][col] < b[row]/a[row][col])) {
         row = i;
@@ -161,7 +160,7 @@ double xsimplex(int m, int n, double** a, double* b, double* c, double* x, doubl
   return s.y;
 }
 
-double simplex(int m, int n, double** a, double* b, double* c, double* x, double y, int* var, int h) {
+double simplex(int m, int n, double** a, double* b, double* c, double* x, double y) {
   return xsimplex(m, n, a, b, c, x, y, NULL, 0);
 }
 
@@ -181,33 +180,44 @@ int main(int argc, char *argv[])
   int m;
   int n;
   double** a;
-  double b; 
-  double c1;
-  double c2;
+  double* b; 
+  double* c;
   
   scanf("%d %d", &m, &n);
-  scanf("%lf %lf", &c1, &c2);
   a = make_matrix(m, n);
+  b = calloc(m, sizeof(double));
+  c = calloc(n, sizeof(double));
 
+  for (int i = 0; i < n; i++) {
+    scanf("%lf", &c[i]);
+  }
   for (int i = 0; i < m; i += 1) {
     for (int j = 0; j < n; j += 1) {
       scanf("%lf", &a[i][j]);
     }
   }
-  printf("max z = %5.1lfx0 %+5.1lfx1\n", c1, c2);
+  printf("max z = %5.1lf x0", c[0]);
+  for(int i=1; i<n; i+=1) {
+    printf(" + %lf x%d", c[i], i);
+  }
+  printf("\n");
   for (int i = 0; i < m; i++) {
     /*printf("%+10.3lfx0 %+10.3lfx1 <= %10.3lf\n", a[i][0], a[i][1], a[m-1][i]);*/
     for (int j = 0; j < n; j++) {
-      printf("%+10.3lfx%d", a[i][j], j);
+      printf("%+10.3lf x%d", a[i][j], j);
     }
-    scanf("%lf", &b);
-    printf("<=%10.3lf\n", b);
+    scanf("%lf", &b[i]);
+    printf(" <=%10.3lf\n", b[i]);
   }
+  double *x = calloc(n, sizeof(double));
+  for (int i = 0; i < n; i++)
+    x[i] = 0;
+  printf("Solution y=%lf\n", simplex(m, n, a, b, c, x, 0));
 
- for (int i = 0; i < m; i += 1) {
+  for (int i = 0; i < m; i += 1) {
     free(a[i]);
- }
- free(a);
+  }
+  free(a);
 
   return 0;
 }
