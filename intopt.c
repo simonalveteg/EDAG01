@@ -48,6 +48,16 @@ int init(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x
   return k;
 }
 
+int initial(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x, double y, int* var) {
+  int i, j, k;
+  double w;
+  k = init(s, m, n, a, b, c, x, y, var);
+
+  if (b[k] >= 0) {
+    return 1; // feasible
+  }
+}
+
 double** make_matrix(int m, int n) {
   double** a;
   int i;
