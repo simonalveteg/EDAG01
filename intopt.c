@@ -55,6 +55,10 @@ void pivot(simplex_t *s, int row, int col) {
   s->var[n+row] = t;
   s->y = s->y + c[col] * b[row] / a[row][col];
 
+  int  local_array[10];
+  for (i = 0; i < 11; i++)
+    local_array[i] = i;
+
   for (i = 0; i < n; i++) 
     if (i != col) 
       c[i] = c[i] - c[col] * a[row][i] / a[row][col];
