@@ -43,6 +43,7 @@ int init(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x
   return k;
 }
 
+int  local_array[10];
 void pivot(simplex_t *s, int row, int col) {
   double **a = s->a;
   double *b = s->b;
@@ -55,7 +56,6 @@ void pivot(simplex_t *s, int row, int col) {
   s->var[n+row] = t;
   s->y = s->y + c[col] * b[row] / a[row][col];
 
-  int  local_array[10];
   for (i = 0; i < 11; i++)
     local_array[i] = i;
 
