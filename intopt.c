@@ -16,6 +16,8 @@ void* xmalloc(size_t size) {
   return ptr;
 }
 
+void bp(void) {}
+
 int init(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x, double y, int* var) {
   int i, k;
   s->m = m;
@@ -28,7 +30,7 @@ int init(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x
   s->var = var;
 
   if (s->var == NULL) {
-    s->var = xmalloc((m+n)*sizeof(int));
+    s->var = xmalloc((m+n+1)*sizeof(int));
     for (i = 0; i < m+n; i++) {
       s->var[i] = i;
     }
@@ -95,15 +97,15 @@ void prepare(simplex_t *s, int k) {
   for (i=0; i<m; i++)
     s->a[i][n-1] = -1;
 
-  s->x = xmalloc((m+n)*sizeof(double)); // doesn't free the old?
-  s->c = xmalloc(n*sizeof(double));
+  s->x = calloc(m+n, sizeof(double)); // doesn't free the old?
+  s->c = calloc(n, sizeof(double));
   s->c[n-1] = -1;
   s->n = n;
   pivot(s, k, n-1);
 }
 
 int initial(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x, double y, int* var) {
-  int i, j, k;
+  int i, j, k = 0;
   double w;
   k = init(s, m, n, a, b, c, x, y, var);
 
@@ -115,7 +117,7 @@ int initial(simplex_t *s, int m, int n, double** a, double* b, double* c, double
   s->y = xsimplex(m, n, s->a, s->b, s->c, s->x, 0, s->var, 1);
 
   for (i = 0; i < m+n; i++) {
-    if (s->var[i] = m+n-1) {
+    if (s->var[i] == m+n-1) {
       if (abs(s->x[i])>epsilon) {
         free(s->x);
         free(s->c);
@@ -145,33 +147,20 @@ int initial(simplex_t *s, int m, int n, double** a, double* b, double* c, double
       s->a[k][i] = s->a[k][i];
       s->a[k][i] = w;
     }
-    pivot(s, i-n, j);
-    i = j;
-  }
-  if (i < n-1) {
-    k = s->var[i];
-    s->var[i] = s->var[n-1];
-    s->var[n-1] = k;
-    for (k = 0; k < m; k++) {
-      w = s->a[k][n-1];
-      s->a[k][n-1] = s->a[k][i];
-      s->a[k][i] = w;
-    }
   }
   free(s->c);
   s->c = c;
   s->y = y;
   for (k = n-1;k < n+m-1; k++)
     s->var[k] = s->var[k+1];
-  n = s->n;
-  n = s->var[k+1];
+  n = s->n = s->n-1;
   double* t = calloc(n, sizeof(double*));
 
   for (k = 0; k < n; k++) {
     for (j = 0; j < n; j++) {
-      if (k = s->var[j]) {
+      if (k == s->var[j]) {
         t[j] = t[j] + s->c[k];
-        break;
+        goto next_k;
       }
     }
     for (j = 0; j < m; j++) {
@@ -179,8 +168,10 @@ int initial(simplex_t *s, int m, int n, double** a, double* b, double* c, double
         break;
     }
     s->y = s->y + s->c[k]*s->b[j];
-    for (i = 0; j < m; j++) 
+    for (i = 0; i < n; i++) 
       t[i] = t[i] - s->c[k]*s->a[j][i];
+
+  next_k:;
   }
   for (i = 0; i < n; i++)
     s->c[i] = t[i];
@@ -226,7 +217,7 @@ double xsimplex(int m, int n, double** a, double* b, double* c, double* x, doubl
     pivot(&s, row, col);
   }
 
-  if (h = 0) {
+  if (h == 0) {
     for (i = 0; i < n; i++) {
       if (s.var[i] < n) {
         x[s.var[i]] = 0;
@@ -304,10 +295,13 @@ int main(int argc, char *argv[])
     x[i] = 0;
   printf("Solution y=%lf\n", simplex(m, n, a, b, c, x, 0));
 
-  for (int i = 0; i < m; i += 1) {
+  for (int i = 0; i < m; i += 1)
     free(a[i]);
-  }
+  
   free(a);
+  free(b);
+  free(c);
+  free(x);
 
   return 0;
 }
