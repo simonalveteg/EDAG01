@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h> // for NAN
+#include <math.h>
 
 // header
 
@@ -45,7 +45,7 @@ int select_nonbasic(simplex_t *s);
 double xsimplex(int m, int n, double** a, double* b, double* c, double* x, double y, int* var, int h);
 double simplex(int m, int n, double** a, double* b, double* c, double* x, double y);
 double** make_matrix(int m, int n);
-int main(int argc, char *argv[]);
+int main(void);
 
 node_t* initial_node(int m, int n, double **a, double *b, double *c);
 node_t* extend(node_t *p, int m, int n, double **a, double *b, double *c, int k, double ak, double bk);
@@ -73,6 +73,37 @@ void* xmalloc(size_t size) {
 }
 
 void bp(void) {}
+
+void free_node(node_t **p)
+{
+  if (*p==NULL) return;
+	if ((*p)->a!=NULL){
+		for (int i = 0; i < (*p)->m+1; i++) {
+      free((*p)->a[i]);
+      (*p)->a[i] = NULL;
+		}
+		free((*p)->a);
+    (*p)->a = NULL;
+	}
+	if ((*p)->b!=NULL) {
+		free((*p)->b);
+    (*p)->b = NULL;
+  }
+	if ((*p)->c!=NULL) {
+		free((*p)->c);
+    (*p)->c = NULL;
+  }
+	if ((*p)->x!=NULL) {
+		free((*p)->x);
+    (*p)->x = NULL;
+  }
+	free((*p)->min);
+  (*p)->min = NULL;
+	free((*p)->max);
+  (*p)->max = NULL;
+	free(*p);
+  *p = NULL;
+}
 
 node_t* initial_node(int m, int n, double **a, double *b, double *c) {
   int i, j;
@@ -105,7 +136,7 @@ node_t* initial_node(int m, int n, double **a, double *b, double *c) {
 } 
 
 node_t* extend(node_t *p, int m, int n, double **a, double *b, double *c, int k, double ak, double bk) {
-  node_t *q = calloc(1, sizeof(node_t));
+  node_t *q = xmalloc(sizeof(*q));
   int i, j;
   q->k = k;
   q->ak = ak;
@@ -124,8 +155,8 @@ node_t* extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
   q->b = calloc(q->m+1, sizeof(double));
   q->c = calloc(q->n+1, sizeof(double));
   q->x = calloc(q->n+1, sizeof(double));
-  q->min = calloc(q->n, sizeof(double));
-  q->max = calloc(q->n, sizeof(double));
+  q->min = calloc(n, sizeof(double));
+  q->max = calloc(n, sizeof(double));
   
   // copy values to q
   for (i = 0; i < n; i++) {
@@ -134,7 +165,7 @@ node_t* extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
     q->c[i] = c[i];
   }
   for (i = 0; i < m; i++) {
-    for (j=0; j<n; j++)
+    for (j = 0; j < n; j++)
 			q->a[i][j] = a[i][j];
 
     q->b[i] = b[i];
@@ -143,6 +174,7 @@ node_t* extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
   if (ak > 0) {
     if (q->max[k] == INFINITY || bk < q->max[k])
       q->max[k] = bk;
+
   } else if (q->min[k] == -INFINITY || -bk > q->min[k])
     q->min[k] = -bk;
 
@@ -150,12 +182,12 @@ node_t* extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
     if (q->min[j] > -INFINITY) {
       q->a[i][j] = -1;
       q->b[i] = -q->min[j];
-      i += 1;
+      i++;
     }
     if (q->max[j] < INFINITY) {
       q->a[i][j] = 1;
       q->b[i] = q->max[j];
-      i += 1;
+      i++;
     }
   }
   return q;
@@ -163,28 +195,28 @@ node_t* extend(node_t *p, int m, int n, double **a, double *b, double *c, int k,
 
 int is_integer(double *xp) {
   double x = *xp;
-  double r = round(x);
+  double r = lround(x);
   if (fabs(r-x) < epsilon) {
     *xp = r;
     return 1;
-  }
-  return 0;
+  } else return 0;
 }
 
 int integer(node_t *p) {
   int i;
-  for (i = 0; i < p->n; i++)
-    if (!is_integer(&p->x[i]))
+  for (i = 0; i < p->n; i++) {
+    if (!is_integer(&(p->x[i])))
       return 0;
-  return 1;
+  } return 1;
 }
 
 int list_size_of(list_t *h) {
+  bp();
   int count = 0;
   list_t *current = h;
 
-  while(current != NULL) {
-    count ++;
+  while(current != NULL && current->node != NULL) {
+    count++;
     current = current->next;
   }
   return count;
@@ -199,7 +231,7 @@ list_t* list_at_index(list_t *h, int i) {
 
 void list_add(list_t **h, node_t *q) {
   // create new element with node
-  list_t *new_node = (list_t *)malloc(sizeof(list_t));
+  list_t *new_node = xmalloc(sizeof(list_t));
   new_node->node = q;
   new_node->next = NULL;
 
@@ -232,8 +264,10 @@ void delete_nodes(list_t **h, double pz) {
         // Move head to the next node
         *h = (*h)->next; 
         // Free memory of the old head
-        free(old->node); // Free the node data if necessary
+        free_node(&old->node);
+        old->node = NULL;
         free(old);       // Free the list node
+        old = NULL;
     }
 
     // Now, *h points to the first valid node or NULL
@@ -247,8 +281,10 @@ void delete_nodes(list_t **h, double pz) {
             // Remove the next node from the list
             current->next = next->next; 
             // Free memory
-            free(next->node); // Free the node data if necessary
+            free(next->node); // Free the node data
+            next->node = NULL;
             free(next);       // Free the list node
+            next = NULL;
         } else {
             // Move to the next node only if no deletion was made
             current = current->next; 
@@ -256,10 +292,35 @@ void delete_nodes(list_t **h, double pz) {
     }
 }
 
-node_t* pop(list_t *h) {
-  node_t *node = h->node;
-  h = h->next;
-  return node;
+node_t* pop(list_t **h) {
+    // Check if the list is empty
+    if (*h == NULL) {
+        return NULL;  // List is empty
+    }
+    
+    bp();
+    // If there's only one node
+    if ((*h)->next == NULL) {
+        node_t *node = (*h)->node;  // Store the only node's data
+        (*h)->node = NULL; // Empty list
+        /*free(*h);  // Free the only node*/
+        /**h = NULL;*/
+        return node;  // Return the only node
+    }
+
+    list_t *current = *h;
+
+    // Traverse the list to find the second-to-last node
+    while (current->next->next != NULL) {
+        current = current->next;
+    }
+
+    // Current is now the second-to-last node
+    node_t *node = current->next->node;  // Store the last node's data
+    free(current->next);  // Free the last node's memory
+    current->next = NULL;  // Set the second-to-last node as the last one
+
+    return node;  // Return the node (last node in the list)
 }
 
 void bound(node_t *p, list_t *h, double *zp, double *x) {
@@ -268,33 +329,62 @@ void bound(node_t *p, list_t *h, double *zp, double *x) {
     *zp = p->z;
     for (i = 0; i < p->n; i++) 
       x[i] = p->x[i];
+
     delete_nodes(&h, p->z);
   }
 }
 
 int branch(node_t *q, double z) {
   double min, max;
-  int h;
+  int h, i;
 
   if (q->z < z) 
     return 0;
 
   for (h = 0; h < q->n; h++) {
-    if (!is_integer(&q->x[h])) {
-      if (q->min[h] = -INFINITY)
+    if (!is_integer(&(q->x[h]))) {
+      if (q->min[h] == -INFINITY)
         min = 0;
       else 
         min = q->min[h];
       max = q->max[h];
-      if (floor(q->x[h])<min || ceil(q->x[h])>max)
+      if (floor(q->x[h]) < min || ceil(q->x[h]) > max)
         continue;
       q->h = h;
       q->xh = q->x[h];
       //delete a,b,c,x of q (or recycle in another way??)
-      free(q->a);
-      free(q->b);
-      free(q->c);
-      free(q->x);
+      /*for (i = 0; i < q->m; i++) {*/
+      /*  free(q->a[i]);*/
+      /*  q->a[i] = NULL;*/
+      /*}*/
+      /*free(q->a);*/
+      /*q->a = NULL;*/
+      /*free(q->b);*/
+      /*q->b = NULL;*/
+      /*free(q->c);*/
+      /*q->c = NULL;*/
+      /*free(q->x);*/
+      /*q->x = NULL;*/
+      if (q->a != NULL) {
+        for (i = 0; i < q->m + 1; i++) {
+          free(q->a[i]);
+          q->a[i] = NULL;
+        }
+        free(q->a);
+        q->a = NULL;
+      }
+      if (q->b != NULL) {
+        free(q->b);
+        q->b = NULL;
+      }
+      if (q->c != NULL) {
+        free(q->c);
+        q->c = NULL;
+      }
+      if (q->x != NULL) {
+        free(q->x);
+        q->x = NULL;
+      }
       return 1;
     }
   }
@@ -303,16 +393,21 @@ int branch(node_t *q, double z) {
 
 void succ(node_t *p, list_t *h, int m, int n, double **a, double *b, double *c, int k, double ak, double bk, double *zp, double *x){
   node_t *q = extend(p, m, n, a, b, c, k, ak, bk);
-  if (q == NULL) {
+
+  if (q == NULL) 
+    return;
+
+  q->z = simplex(q->m, q->n, q->a, q->b, q->c, q->x, 0);
+
+  if (isfinite(q->z)) {
     if (integer(q)) {
       bound(q, h, zp, x);
-    }
-    else if (branch(q, *zp)){
+    } else if (branch(q, *zp)){
       list_add(&h, q);
       return;
     }
   }
-  free(q); // onödigt då jag allokerar minnet i list_add
+  free_node(&q);
 }
 
 double intopt(int m, int n, double **a, double *b, double *c, double *x) {
@@ -322,6 +417,7 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
   h->node = p;
   h->next = NULL;
   double z = -INFINITY;
+
   p->z = simplex(p->m, p->n, p->a, p->b, p->c, p->x, 0);
 
   if (integer(p) || !isfinite(p->z)) {
@@ -330,20 +426,25 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
       // copy px to x 
       for (i = 0; i<n; i++)
 				x[i] = p->x[i];
-      // delete p 
-      free(p);
-      return z;
     }
+    // delete p BENJAMIN GÖR DETTA I IF SATSEN OVAN??
+    free_node(&p);
+    free(h);
+    h = NULL;
+    return z;
   }
+  
   branch(p, z);
+
   while (list_size_of(h) != 0) {
-    // take p from h????
-    p = pop(h);
-		succ(p, h, m, n, a, b, c, p->h, 1, floor(p->xh), &z, x);
-		succ(p, h, m, n, a, b, c, p->h, -1, -ceil(p->xh), &z, x);
-    free(p);
+    node_t *q = pop(&h); // take p from h
+		succ(q, h, m, n, a, b, c, q->h, 1, floor(q->xh), &z, x);
+		succ(q, h, m, n, a, b, c, q->h, -1, -ceil(q->xh), &z, x);
+    free_node(&q);
   }
-  if (z = -INFINITY)
+  free(h);
+  h = NULL;
+  if (z == -INFINITY)
     return NAN;
   else 
     return z;
@@ -440,7 +541,7 @@ void prepare(simplex_t *s, int k) {
 }
 
 int initial(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x, double y, int* var) {
-  int i, j, k = 0;
+  int i, j, k;
   double w;
   k = init(s, m, n, a, b, c, x, y, var);
 
@@ -585,16 +686,17 @@ double** make_matrix(int m, int n) {
   int i;
 
   a = calloc(m, sizeof(double*));
-  for (int i = 0; i < m; i += 1) {
+  for (i = 0; i < m; i += 1) {
     a[i] = calloc(n, sizeof(double));
   }
   return a;
 }
 
-int main(int argc, char *argv[])
+int main(void)
 {
-  int m;
-  int n;
+  int i, j;
+  int m = 0;
+  int n = 0;
   double** a;
   double* b; 
   double* c;
@@ -604,40 +706,46 @@ int main(int argc, char *argv[])
   b = calloc(m, sizeof(double));
   c = calloc(n, sizeof(double));
 
-  for (int i = 0; i < n; i++) {
+  for (i = 0; i < n; i++) {
     scanf("%lf", &c[i]);
   }
-  for (int i = 0; i < m; i += 1) {
-    for (int j = 0; j < n; j += 1) {
+  for (i = 0; i < m; i += 1) {
+    for (j = 0; j < n; j += 1) {
       scanf("%lf", &a[i][j]);
     }
   }
   printf("max z = %5.1lf x0", c[0]);
-  for(int i=1; i<n; i+=1) {
+  for(i=1; i<n; i+=1) {
     printf(" + %lf x%d", c[i], i);
   }
   printf("\n");
-  for (int i = 0; i < m; i++) {
+  for (i = 0; i < m; i++) {
     /*printf("%+10.3lfx0 %+10.3lfx1 <= %10.3lf\n", a[i][0], a[i][1], a[m-1][i]);*/
-    for (int j = 0; j < n; j++) {
+    for (j = 0; j < n; j++) {
       printf("%+10.3lf x%d", a[i][j], j);
     }
     scanf("%lf", &b[i]);
     printf(" <=%10.3lf\n", b[i]);
   }
-  double *x = calloc(n, sizeof(double));
-  for (int i = 0; i < n; i++)
+  double *x = calloc(n+m+1, sizeof(double));
+  for (i = 0; i < n; i++)
     x[i] = 0;
   /*printf("Solution y=%lf\n", simplex(m, n, a, b, c, x, 0));*/
   printf("Solution y=%lf\n", intopt(m, n, a, b, c, x));
 
-  for (int i = 0; i < m; i += 1)
+  for (i = 0; i < m; i += 1) {
     free(a[i]);
+    a[i] = NULL;
+  }
   
   free(a);
+  a = NULL;
   free(b);
+  b = NULL;
   free(c);
+  c = NULL;
   free(x);
+  x = NULL;
 
   return 0;
 }
