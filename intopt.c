@@ -32,10 +32,17 @@ typedef struct simplex_t {
   double y;
 } simplex_t;
 
-typedef struct list_t {
-	node_t *node;
-	struct list_t *next;
-} list_t;
+typedef struct list_t list_t;
+typedef struct link_t link_t;
+list_t* create_list(node_t* first); 
+static link_t* create_link(void* data); 
+void insert(list_t* head, void* data);
+void free_list(list_t* head); 
+int remove_link_at_index(list_t* head, int index); 
+int list_size(list_t* head); 
+void* get_data_at_index(list_t* head, int index);
+void delete_nodes(list_t* h, double zp); 
+node_t* pop(list_t* head);
 
 int init(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x, double y, int* var);
 void pivot(simplex_t *s, int row, int col);
@@ -210,118 +217,6 @@ int integer(node_t *p) {
   } return 1;
 }
 
-int list_size_of(list_t *h) {
-  bp();
-  int count = 0;
-  list_t *current = h;
-
-  while(current != NULL && current->node != NULL) {
-    count++;
-    current = current->next;
-  }
-  return count;
-}
-
-list_t* list_at_index(list_t *h, int i) {
-  list_t *current = h;
-  for (int j = 0; j < i; j++)
-    current = current->next;
-  return current;
-}
-
-void list_add(list_t **h, node_t *q) {
-  // create new element with node
-  list_t *new_node = xmalloc(sizeof(list_t));
-  new_node->node = q;
-  new_node->next = NULL;
-
-  // If the list is empty, the new node becomes the head
-  if (*h == NULL) {
-      *h = new_node;
-      return;
-  }
-
-  // loop through list to get the last element
-  list_t *current = *h;
-  while(current->next != NULL) {
-    current = current->next;
-  }
-  // set our new element as next
-  current->next = new_node;
-}
-
-// Function to delete nodes based on the given condition
-void delete_nodes(list_t **h, double pz) {
-    // Check if the list is empty
-    if (*h == NULL) {
-        return; // Nothing to delete
-    }
-
-    // Check first element
-    while (*h != NULL && (*h)->node->z < pz) {
-        // Store old head
-        list_t *old = *h;
-        // Move head to the next node
-        *h = (*h)->next; 
-        // Free memory of the old head
-        free_node(&old->node);
-        old->node = NULL;
-        free(old);       // Free the list node
-        old = NULL;
-    }
-
-    // Now, *h points to the first valid node or NULL
-    list_t *current = *h;
-
-    // Iterate through the list and delete nodes
-    while (current != NULL && current->next != NULL) {
-        if (current->next->node->z < pz) {
-            // Store the next node
-            list_t *next = current->next;
-            // Remove the next node from the list
-            current->next = next->next; 
-            // Free memory
-            free(next->node); // Free the node data
-            next->node = NULL;
-            free(next);       // Free the list node
-            next = NULL;
-        } else {
-            // Move to the next node only if no deletion was made
-            current = current->next; 
-        }
-    }
-}
-
-node_t* pop(list_t **h) {
-    // Check if the list is empty
-    if (*h == NULL) {
-        return NULL;  // List is empty
-    }
-    
-    bp();
-    // If there's only one node
-    if ((*h)->next == NULL) {
-        node_t *node = (*h)->node;  // Store the only node's data
-        (*h)->node = NULL; // Empty list
-        /*free(*h);  // Free the only node*/
-        /**h = NULL;*/
-        return node;  // Return the only node
-    }
-
-    list_t *current = *h;
-
-    // Traverse the list to find the second-to-last node
-    while (current->next->next != NULL) {
-        current = current->next;
-    }
-
-    // Current is now the second-to-last node
-    node_t *node = current->next->node;  // Store the last node's data
-    free(current->next);  // Free the last node's memory
-    current->next = NULL;  // Set the second-to-last node as the last one
-
-    return node;  // Return the node (last node in the list)
-}
 
 void bound(node_t *p, list_t *h, double *zp, double *x) {
   int i;
@@ -330,7 +225,8 @@ void bound(node_t *p, list_t *h, double *zp, double *x) {
     for (i = 0; i < p->n; i++) 
       x[i] = p->x[i];
 
-    delete_nodes(&h, p->z);
+    // remove and delete all nodes q in h with q->z < p->z
+    delete_nodes(h, p->z);
   }
 }
 
@@ -353,18 +249,6 @@ int branch(node_t *q, double z) {
       q->h = h;
       q->xh = q->x[h];
       //delete a,b,c,x of q (or recycle in another way??)
-      /*for (i = 0; i < q->m; i++) {*/
-      /*  free(q->a[i]);*/
-      /*  q->a[i] = NULL;*/
-      /*}*/
-      /*free(q->a);*/
-      /*q->a = NULL;*/
-      /*free(q->b);*/
-      /*q->b = NULL;*/
-      /*free(q->c);*/
-      /*q->c = NULL;*/
-      /*free(q->x);*/
-      /*q->x = NULL;*/
       if (q->a != NULL) {
         for (i = 0; i < q->m + 1; i++) {
           free(q->a[i]);
@@ -403,7 +287,7 @@ void succ(node_t *p, list_t *h, int m, int n, double **a, double *b, double *c, 
     if (integer(q)) {
       bound(q, h, zp, x);
     } else if (branch(q, *zp)){
-      list_add(&h, q);
+      insert(h, q);
       return;
     }
   }
@@ -413,9 +297,7 @@ void succ(node_t *p, list_t *h, int m, int n, double **a, double *b, double *c, 
 double intopt(int m, int n, double **a, double *b, double *c, double *x) {
   int i;
   node_t *p = initial_node(m, n, a, b, c);
-  list_t *h = malloc(sizeof(list_t));
-  h->node = p;
-  h->next = NULL;
+  list_t *h = create_list(p);
   double z = -INFINITY;
 
   p->z = simplex(p->m, p->n, p->a, p->b, p->c, p->x, 0);
@@ -429,15 +311,17 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
     }
     // delete p BENJAMIN GÖR DETTA I IF SATSEN OVAN??
     free_node(&p);
-    free(h);
-    h = NULL;
+    /*free(h);*/
+    /*h = NULL;*/
+    free_list(h);
     return z;
   }
   
   branch(p, z);
 
-  while (list_size_of(h) != 0) {
-    node_t *q = pop(&h); // take p from h
+  while (list_size(h) != 0) {
+    int size = list_size(h);
+    node_t *q = pop(h);
 		succ(q, h, m, n, a, b, c, q->h, 1, floor(q->xh), &z, x);
 		succ(q, h, m, n, a, b, c, q->h, -1, -ceil(q->xh), &z, x);
     free_node(&q);
@@ -748,5 +632,157 @@ int main(void)
   x = NULL;
 
   return 0;
+}
+
+
+struct list_t {
+    link_t* first;
+    link_t* last;
+};
+
+struct link_t {
+    link_t *next;
+    void *data;
+};
+
+list_t* create_list(node_t *first) {
+    list_t *head;
+    link_t *link = create_link(first);
+
+    head = xmalloc(sizeof(list_t));
+    head->first = head->last  = link;
+    return head;
+}
+
+static link_t* create_link(void* data) {
+    link_t *link;
+
+    link = xmalloc(sizeof(link_t));
+    link->next = NULL;
+    link->data = data;
+    return link;
+}
+
+void insert(list_t* head, void* data) {
+    link_t* link;
+    link = create_link(data);
+
+    if (head->first == NULL) {
+        head->first = link;
+    } else {
+        head->last->next = link;
+    }
+    head->last = link;
+}
+
+void free_list(list_t* head) {
+    link_t* p;
+    link_t* q;
+
+    p = head->first;
+    if (head != NULL) {
+        free(head);
+        head = NULL;
+    }
+
+    while(p != NULL) {
+        q = p->next;
+        if (p != NULL) {
+            free(p);
+            p = NULL;
+        }
+        p = q;
+    }
+}
+
+int list_size(list_t* head) {
+  int size = 0;
+  link_t* current = head->first;
+
+  while (current != NULL) {
+    size++;
+    current = current->next;
+  }
+
+  return size;
+}
+
+void delete_nodes(list_t* h, double zp) {
+    if (h == NULL) return;  // Nothing to delete
+
+    link_t* current = h->first;
+    link_t* prev = NULL;
+
+    while (current != NULL) {
+        node_t* node = current->data;
+
+        if (node->z < zp) {
+            // We are deleting this node
+
+            // Check if current is the last node before setting next_node
+            link_t* next_node = current->next;
+
+            if (prev == NULL) {
+                // If deleting the first node
+                h->first = next_node;
+            } else {
+                // Skip over the deleted node
+                prev->next = next_node;
+            }
+
+            // Check if the node being deleted is the last node
+            if (current == h->last) {
+                h->last = prev;  // Set h->last to prev, or NULL if no prev exists
+            }
+
+            // Free memory
+            free(current->data);
+            free(current);
+
+            current = next_node;
+        } else {
+            // Move to the next node if no deletion was made
+            prev = current;
+            current = current->next;
+        }
+    }
+
+    // If the list is now empty, make sure h->last is NULL
+    if (h->first == NULL) {
+        h->last = NULL;
+    }
+}
+
+node_t* pop(list_t* head) {
+  if (head == NULL || head->first == NULL) return NULL; // List is empty.
+
+  link_t* prev = NULL;
+  link_t* current = head->first;
+
+  // Case 1: List has only one element
+  if (head->first == head->last) {
+    node_t* data = current->data;  // Get the data before freeing
+    free(current);  // Free the only node
+    head->first = head->last = NULL;  // Reset list pointers
+    return data;
+  }
+
+  // Case 2: List has more than one element
+  // Traverse to the last element
+  while (current != head->last) {
+    prev = current;
+    current = current->next;
+  }
+
+  // At this point, prev is the second-to-last node, and current is the last node
+
+  // Detach the last node safely
+  prev->next = NULL;
+  head->last = prev;  // Update head->last to the previous node
+
+  node_t* data = current->data;  // Get the data before freeing
+  free(current);  // Free the last node
+
+  return data;
 }
 
