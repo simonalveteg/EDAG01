@@ -104,10 +104,14 @@ void free_node(node_t **p)
 		free((*p)->x);
     (*p)->x = NULL;
   }
-	free((*p)->min);
-  (*p)->min = NULL;
-	free((*p)->max);
-  (*p)->max = NULL;
+  if ((*p)->min!=NULL) {
+    free((*p)->min);
+    (*p)->min = NULL;
+  }
+  if ((*p)->max!=NULL) {
+    free((*p)->max);
+    (*p)->max = NULL;
+  }
 	free(*p);
   *p = NULL;
 }
@@ -272,6 +276,7 @@ int branch(node_t *q, double z) {
       return 1;
     }
   }
+  return 0;
 }
 
 
@@ -320,7 +325,6 @@ double intopt(int m, int n, double **a, double *b, double *c, double *x) {
   branch(p, z);
 
   while (list_size(h) != 0) {
-    int size = list_size(h);
     node_t *q = pop(h);
 		succ(q, h, m, n, a, b, c, q->h, 1, floor(q->xh), &z, x);
 		succ(q, h, m, n, a, b, c, q->h, -1, -ceil(q->xh), &z, x);
@@ -359,7 +363,6 @@ int init(simplex_t *s, int m, int n, double** a, double* b, double* c, double* x
   return k;
 }
 
-int  local_array[10];
 void pivot(simplex_t *s, int row, int col) {
   double **a = s->a;
   double *b = s->b;
@@ -372,9 +375,6 @@ void pivot(simplex_t *s, int row, int col) {
   s->var[n+row] = t;
   s->y = s->y + c[col] * b[row] / a[row][col];
 
-  for (i = 0; i < 11; i++)
-    local_array[i] = i;
-
   for (i = 0; i < n; i++) 
     if (i != col) 
       c[i] = c[i] - c[col] * a[row][i] / a[row][col];
@@ -385,11 +385,12 @@ void pivot(simplex_t *s, int row, int col) {
     if (i != row) 
       b[i] = b[i] - a[i][col] * b[row] / a[row][col];
 
+  double inverse = 1.0 / a[row][col];
   for (i = 0; i < m; i++) 
     if (i != row) 
       for (j = 0; j < n; j++) 
         if (j != col) 
-          a[i][j] = a[i][j] - a[i][col] * a[row][j] / a[row][col];
+          a[i][j] = a[i][j] - a[i][col] * a[row][j] * inverse;
   
   for (i = 0; i < m; i++) 
     if (i != row) 
