@@ -386,11 +386,14 @@ void pivot(simplex_t *s, int row, int col) {
       b[i] = b[i] - a[i][col] * b[row] / a[row][col];
 
   double inverse = 1.0 / a[row][col];
-  for (i = 0; i < m; i++) 
-    if (i != row) 
+  for (i = 0; i < m; i++) {
+    if (i != row) {
+      double factor = a[i][col] * inverse;
       for (j = 0; j < n; j++) 
         if (j != col) 
-          a[i][j] = a[i][j] - a[i][col] * a[row][j] * inverse;
+          a[i][j] -= a[row][j] * factor;
+    }
+  }
   
   for (i = 0; i < m; i++) 
     if (i != row) 
